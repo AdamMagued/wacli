@@ -187,6 +187,8 @@ func (a *App) addSyncEventHandler(ctx context.Context, opts SyncOptions, message
 			}
 		case *events.AppStateSyncError:
 			a.handleAppStateSyncError(ctx, v, &appStateRecoveries)
+		case *wa.AppStateKeyUnavailable:
+			a.warnEmptyAppStateKey(v)
 		case *events.LoggedOut:
 			// WhatsApp revoked this session (linked device removed on the phone,
 			// or a logout/ban). whatsmeow reconnects on Disconnected, so without

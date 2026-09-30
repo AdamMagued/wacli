@@ -175,7 +175,7 @@ func (a *App) OpenWA() error {
 	}
 	if a.wa == nil {
 		sessionPath := filepath.Join(a.opts.StoreDir, "session.db")
-		cli, err := wa.New(wa.Options{StorePath: sessionPath})
+		cli, err := wa.New(wa.Options{StorePath: sessionPath, KeyStateStore: a.db})
 		if err != nil {
 			return err
 		}
