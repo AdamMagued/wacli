@@ -46,6 +46,22 @@ type UpsertMessageParams struct {
 	DeletionReason  string
 }
 
+// HasVisibleContent reports whether the message carries visible user content
+// (such as text, media, or caption) rather than protocol events, placeholder rows,
+// or reactions.
+func (p UpsertMessageParams) HasVisibleContent() bool {
+	if strings.TrimSpace(p.ReactionToID) != "" || strings.TrimSpace(p.ReactionEmoji) != "" {
+		return false
+	}
+	if p.Revoked || p.DeletedForMe {
+		return false
+	}
+	return strings.TrimSpace(p.Text) != "" ||
+		strings.TrimSpace(p.MediaType) != "" ||
+		strings.TrimSpace(p.MediaCaption) != "" ||
+		len(p.Buttons) > 0
+}
+
 func messageSelectColumns(snippet string) string {
 	return fmt.Sprintf(`m.rowid, m.chat_jid, COALESCE(c.name,''), m.msg_id, COALESCE(m.sender_jid,''), COALESCE(m.sender_name,''), m.ts, m.from_me, COALESCE(m.text,''), COALESCE(m.display_text,''), COALESCE(m.quoted_msg_id,''), COALESCE(m.quoted_sender_jid,''), m.is_forwarded, m.forwarding_score, COALESCE(m.reaction_to_id,''), COALESCE(m.reaction_emoji,''), COALESCE(m.media_type,''), COALESCE(m.media_caption,''), COALESCE(m.filename,''), COALESCE(m.mime_type,''), COALESCE(m.direct_path,''), COALESCE(m.local_path,''), COALESCE(m.downloaded_at,0), CASE WHEN s.msg_id IS NULL THEN 0 ELSE 1 END, COALESCE(s.starred_at,0), m.revoked, m.deleted_for_me, COALESCE(m.deleted_at,0), COALESCE(m.deletion_reason,''), COALESCE(m.payload_purged_at,0), m.edited, COALESCE(m.buttons,''), %s`, snippetSQL(snippet))
 }
@@ -88,7 +104,7 @@ func (d *DB) UpsertMessage(p UpsertMessageParams) error {
 	if p.Edited {
 		editedTS = unix(p.Timestamp)
 	}
-	return d.q.UpsertMessage(storeCtx(), storedb.UpsertMessageParams{
+	if err := d.q.UpsertMessage(storeCtx(), storedb.UpsertMessageParams{
 		ChatJid:         p.ChatJID,
 		ChatName:        nullString(p.ChatName),
 		MsgID:           p.MsgID,
@@ -122,7 +138,15 @@ func (d *DB) UpsertMessage(p UpsertMessageParams) error {
 		Buttons:         buttonsJSON,
 		ChatJid_2:       strings.TrimSpace(p.ChatJID),
 		MsgID_2:         strings.TrimSpace(p.MsgID),
-	})
+	}); err != nil {
+		return err
+	}
+	if !p.FromMe && p.HasVisibleContent() {
+		if err := d.UnarchiveChatIfPermitted(p.ChatJID); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (d *DB) MarkMessageRevoked(chatJID, msgID string) error {

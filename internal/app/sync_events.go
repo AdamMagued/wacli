@@ -107,7 +107,8 @@ func (a *App) addSyncEventHandler(ctx context.Context, opts SyncOptions, message
 			lastEvent.Store(nowUTC().UnixNano())
 			a.handleLiveCallEvent(ctx, v)
 		case *events.AppState, *events.Star, *events.DeleteForMe,
-			*events.Archive, *events.Pin, *events.Mute, *events.MarkChatAsRead:
+			*events.Archive, *events.Pin, *events.Mute, *events.MarkChatAsRead,
+			*events.UnarchiveChatsSetting:
 			lastEvent.Store(nowUTC().UnixNano())
 			a.handleAppStatePersistenceEvent(ctx, v, nil)
 		case *events.HistorySync:
@@ -362,7 +363,7 @@ func (a *App) persistAppStateEvent(ctx context.Context, evt any, tracker *appSta
 		err = a.handleStarEvent(ctx, v)
 	case *events.DeleteForMe:
 		err = a.handleDeleteForMeEvent(ctx, v)
-	case *events.Archive, *events.Pin, *events.Mute, *events.MarkChatAsRead:
+	case *events.Archive, *events.Pin, *events.Mute, *events.MarkChatAsRead, *events.UnarchiveChatsSetting:
 		err = a.handleChatStateEvent(ctx, v)
 	}
 	if tracker != nil {
@@ -373,7 +374,7 @@ func (a *App) persistAppStateEvent(ctx context.Context, evt any, tracker *appSta
 
 func appStateCollectionsForEvent(evt any) []appstate.WAPatchName {
 	switch v := evt.(type) {
-	case *events.Archive, *events.Pin, *events.MarkChatAsRead:
+	case *events.Archive, *events.Pin, *events.MarkChatAsRead, *events.UnarchiveChatsSetting:
 		return []appstate.WAPatchName{appstate.WAPatchRegularLow}
 	case *events.Mute, *events.Star, *events.DeleteForMe:
 		return []appstate.WAPatchName{appstate.WAPatchRegularHigh}
@@ -666,6 +667,15 @@ func (a *App) handleHistorySync(ctx context.Context, opts SyncOptions, v *events
 	var unhandledWarnings historyUnhandledPayloadWarnings
 	defer unhandledWarnings.flush(a)
 	a.emitOrPrint("history_sync", map[string]any{"conversations": len(v.Data.Conversations)}, "\nProcessing history sync (%d conversations)...\n", len(v.Data.Conversations))
+	if v != nil && v.Data != nil && v.Data.GlobalSettings != nil && v.Data.GlobalSettings.AutoUnarchiveChats != nil {
+		if err := a.db.SetUnarchiveChatsSetting(v.Data.GlobalSettings.GetAutoUnarchiveChats()); err != nil {
+			a.emitWarning(
+				"global_settings_store_failed",
+				fmt.Sprintf("warning: failed to store global unarchive chats setting: %v", err),
+				map[string]any{"error": err.Error()},
+			)
+		}
+	}
 	a.storeHistoryCallLogRecords(ctx, v, lastEvent)
 	for _, conv := range v.Data.Conversations {
 		lastEvent.Store(nowUTC().UnixNano())

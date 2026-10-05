@@ -37,7 +37,8 @@ func (a *App) AddChatStatePersistenceHandler(ctx context.Context) (func(), error
 	handlerID := waClient.AddEventHandler(func(evt any) {
 		switch v := evt.(type) {
 		case *events.AppState, *events.Star, *events.DeleteForMe,
-			*events.Archive, *events.Pin, *events.Mute, *events.MarkChatAsRead:
+			*events.Archive, *events.Pin, *events.Mute, *events.MarkChatAsRead,
+			*events.UnarchiveChatsSetting:
 			a.handleAppStatePersistenceEvent(ctx, evt, nil)
 		case *wa.AppStateKeyUnavailable:
 			a.warnEmptyAppStateKey(v)
@@ -518,6 +519,14 @@ func (a *App) handleChatStateEvent(ctx context.Context, evt any) error {
 		}
 		if err != nil {
 			a.emitChatStateWarning("mark_read", v.JID, err)
+			return err
+		}
+	case *events.UnarchiveChatsSetting:
+		if v == nil || v.Action == nil {
+			return nil
+		}
+		if err := a.db.SetUnarchiveChatsSetting(v.Action.GetUnarchiveChats()); err != nil {
+			a.emitChatStateWarning("unarchive_chats_setting", types.JID{}, err)
 			return err
 		}
 	}

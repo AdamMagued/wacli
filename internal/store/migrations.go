@@ -42,6 +42,7 @@ var schemaMigrations = []migration{
 	{version: 26, name: "message identity indexes and selective fts updates", up: migrateMessageIdentityIndexes},
 	{version: 27, name: "repair placeholder chat activity", up: migratePlaceholderChatActivity},
 	{version: 28, name: "unavailable app state keys", up: migrateUnavailableAppStateKeys},
+	{version: 29, name: "account settings", up: migrateAccountSettings},
 }
 
 func migratePlaceholderChatActivity(d *DB) error {
@@ -405,6 +406,9 @@ func (d *DB) ensureCurrentSchema() error {
 	}
 	if err := migrateUnavailableAppStateKeys(d); err != nil {
 		return fmt.Errorf("ensure unavailable app state keys: %w", err)
+	}
+	if err := migrateAccountSettings(d); err != nil {
+		return fmt.Errorf("ensure current account settings schema: %w", err)
 	}
 	return nil
 }
@@ -978,6 +982,14 @@ func migrateUnavailableAppStateKeys(d *DB) error {
   account_jid TEXT NOT NULL,
   key_id BLOB NOT NULL,
   PRIMARY KEY(account_jid,key_id)
+ )`)
+	return err
+}
+
+func migrateAccountSettings(d *DB) error {
+	_, err := d.sql.Exec(`CREATE TABLE IF NOT EXISTS account_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
  )`)
 	return err
 }

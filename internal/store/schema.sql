@@ -210,3 +210,8 @@ CREATE TABLE IF NOT EXISTS poll_votes (
 );
 
 CREATE INDEX IF NOT EXISTS idx_poll_votes_poll ON poll_votes(chat_jid, poll_msg_id);
+
+CREATE TABLE IF NOT EXISTS account_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);

@@ -139,6 +139,16 @@ func TestOpenCreatesExpectedSchema(t *testing.T) {
 	if !indexExists(t, db.sql, "idx_status_messages_ts") {
 		t.Fatalf("expected status_messages timestamp index to exist")
 	}
+
+	settingCols, err := tableColumns(db.sql, "account_settings")
+	if err != nil {
+		t.Fatalf("account_settings tableColumns: %v", err)
+	}
+	for _, want := range []string{"key", "value"} {
+		if !settingCols[want] {
+			t.Fatalf("expected account_settings column %q to exist", want)
+		}
+	}
 }
 
 func TestOpenMigratesLegacyMessageTombstonesWithoutPayloadLoss(t *testing.T) {

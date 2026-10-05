@@ -388,9 +388,20 @@ func chatKind(chat types.JID) string {
 func (a *App) upsertMessageChat(pm wa.ParsedMessage, name string) error {
 	jid := canonicalJIDString(pm.Chat)
 	if pm.HasContent() {
-		return a.db.UpsertChat(jid, chatKind(pm.Chat), name, pm.Timestamp)
+		if err := a.db.UpsertChat(jid, chatKind(pm.Chat), name, pm.Timestamp); err != nil {
+			return err
+		}
+	} else {
+		if err := a.db.UpsertChatMetadata(jid, chatKind(pm.Chat), name); err != nil {
+			return err
+		}
 	}
-	return a.db.UpsertChatMetadata(jid, chatKind(pm.Chat), name)
+	if !pm.FromMe && pm.HasVisibleContent() {
+		if err := a.db.UnarchiveChatIfPermitted(jid); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (a *App) storeParsedMessage(ctx context.Context, pm wa.ParsedMessage) error {

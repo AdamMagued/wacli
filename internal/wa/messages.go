@@ -173,6 +173,25 @@ func (pm ParsedMessage) HasContent() bool {
 		strings.TrimSpace(pm.ReactionEmoji) != ""
 }
 
+// HasVisibleContent reports whether the parsed message carries visible user content
+// (such as text, media, or caption) rather than protocol events, unhandled payloads,
+// or reactions.
+func (pm ParsedMessage) HasVisibleContent() bool {
+	if !pm.HasContent() {
+		return false
+	}
+	if pm.UnhandledPayload != "" {
+		return false
+	}
+	if strings.TrimSpace(pm.ReactionToID) != "" || strings.TrimSpace(pm.ReactionEmoji) != "" {
+		return false
+	}
+	if pm.Revoked {
+		return false
+	}
+	return strings.TrimSpace(pm.Text) != "" || pm.Media != nil || pm.Poll != nil || len(pm.Buttons) > 0
+}
+
 // markUnhandledPayload records which payload field was present when extraction
 // yielded nothing, so the placeholder row can be diagnosed instead of silently
 // discarding content. Field names come from the protobuf descriptor, so new

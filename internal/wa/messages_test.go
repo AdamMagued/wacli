@@ -1310,3 +1310,71 @@ func equalStrings(a, b []string) bool {
 	}
 	return true
 }
+
+func TestParsedMessageHasVisibleContent(t *testing.T) {
+	cases := []struct {
+		name        string
+		pm          ParsedMessage
+		wantVisible bool
+	}{
+		{
+			name:        "empty message",
+			pm:          ParsedMessage{},
+			wantVisible: false,
+		},
+		{
+			name: "unhandled payload senderKeyDistributionMessage",
+			pm: ParsedMessage{
+				UnhandledPayload: "senderKeyDistributionMessage",
+			},
+			wantVisible: false,
+		},
+		{
+			name: "reaction to id",
+			pm: ParsedMessage{
+				ReactionToID:  "msg-123",
+				ReactionEmoji: "👍",
+			},
+			wantVisible: false,
+		},
+		{
+			name: "revoked message",
+			pm: ParsedMessage{
+				Text:    "deleted content",
+				Revoked: true,
+			},
+			wantVisible: false,
+		},
+		{
+			name: "plain text message",
+			pm: ParsedMessage{
+				Text: "Hello world",
+			},
+			wantVisible: true,
+		},
+		{
+			name: "media message",
+			pm: ParsedMessage{
+				Media: &Media{Type: "image"},
+			},
+			wantVisible: true,
+		},
+		{
+			name: "poll creation message",
+			pm: ParsedMessage{
+				Poll: &Poll{Question: "lunch?"},
+			},
+			wantVisible: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.pm.HasVisibleContent()
+			if got != tc.wantVisible {
+				t.Fatalf("HasVisibleContent() = %v, want %v", got, tc.wantVisible)
+			}
+		})
+	}
+}
+
